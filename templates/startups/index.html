@@ -10,6 +10,13 @@
 <div class="container">
 <h1>Startup List</h1>
 <br><br>
+{% if messages %}
+<div class="alert alert-warning">
+  {% for message in messages %}
+    <strong>{{ message }}</strong>
+  {% endfor %}
+</div>
+{% endif %}
 <ul class="list-group">
 {% for s in startups_list %}
   <li class="list-group-item">
