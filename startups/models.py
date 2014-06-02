@@ -16,5 +16,8 @@ class Comment(models.Model):
   startup = models.ForeignKey(StartupDetails)
   created_on = models.DateTimeField(auto_now_add=True)
   
+  class Meta:
+    get_latest_by = "created_on"
+  
   def __unicode__(self):
     return self.text

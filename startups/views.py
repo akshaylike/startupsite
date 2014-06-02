@@ -3,12 +3,31 @@ from startups.models import StartupDetails, Comment
 from django.template import RequestContext
 from django.http import HttpResponse, HttpResponseRedirect
 
+
+def vote(request):
+    startup_id = request.GET['startup_id']
+    startup = StartupDetails.objects.get(id=startup_id)
+    vote = int(request.GET['vote'])
+    if startup_id in request.session:
+        startup.votes -= request.session[startup_id]
+        startup.votes += vote
+        startup.save()
+        request.session[startup_id] = vote
+    return HttpResponse(startup.votes)
+
+
 def index(request):
   context = RequestContext(request)
   startups_list = StartupDetails.objects.all().order_by('-votes')
-  context_dict = {'startups_list': startups_list}
-  response = render_to_response('startups/index.html', context_dict, context)
-  return response
+  for startup in startups_list:
+    if startup.id in request.session:
+      startup.current_user_vote = request.session[startup.id]
+    else:
+      request.session[startup.id] = 0
+      startup.current_user_vote = request.session[startup.id]
+
+  return render_to_response('startups/index.html', {'startups_list': startups_list}, context)
+
 
 def add_comment(request):
   context = RequestContext(request)
@@ -22,36 +41,3 @@ def add_comment(request):
       c = Comment(name=name,text=comment,startup=s)
       c.save()
   return HttpResponseRedirect("/startups/")
-
-
-def upvote(request):
-  context = RequestContext(request)
-  startup_id = request.GET['s_id']
-  v = StartupDetails.objects.get(pk=int(startup_id))
-  if startup_id in request.session:
-    flag = int(request.session[startup_id])
-    if flag == -1:
-      v.votes = v.votes + 2
-      v.save()
-      request.session[startup_id] = 1
-  else:
-    v.votes = v.votes + 1
-    v.save()
-    request.session[startup_id] = 1
-  return HttpResponse(v.votes)
-
-def downvote(request):
-  context = RequestContext(request)
-  startup_id = request.GET['s_id']
-  v = StartupDetails.objects.get(pk=int(startup_id))
-  if startup_id in request.session:
-    flag = int(request.session[startup_id])
-    if flag == 1:
-      v.votes = v.votes - 2
-      v.save()
-      request.session[startup_id] = -1
-  else:
-    v.votes = v.votes - 1
-    v.save()
-    request.session[startup_id] = -1
-  return HttpResponse(v.votes)

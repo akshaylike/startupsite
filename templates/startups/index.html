@@ -11,7 +11,7 @@
 <script type="text/javascript" src="{% static 'js/bootstrap.min.js'%}"></script>
 </head>
 <body>
-<div class="container">
+<div class="container" id="refreshdiv">
 <h1>League Tables: Vote for your favorite startup</h1>
 <hr><br><br>
 {% if messages %}
@@ -21,23 +21,32 @@
   {% endfor %}
 </div>
 {% endif %}
-<div class="list-group">
+
+<ul class="list-group" id="autorefresh">
 {% for s in startups_list %}
-  <div class="list-group-item">
+  <li class="list-group-item">
   <p class="lead">
   <span class="label label-warning"><b class="vote_count" id="vote_{{ s.id }}">{{ s.votes }}</b></span>&nbsp;&nbsp;
   <img src="/media/{{ s.logo }}" class="img-rounded" width=50px height=100%>&nbsp;<strong>{{ s.name }}</strong>: {{ s.short_desc }}
   
   <span class="pull-right">
   <span class="label label-danger"><strong>{{ s.funding_amount|intword }}</strong></span>&nbsp;
-  <a class ="upvotes" id = "{{ s.id }}" data-catid="{{ s.id }}" ><i id="tup{{ s.id }}" class="fa fa-thumbs-o-up fa-2x"></i></a>&nbsp;
-  <a class ="downvotes" id = "{{ s.id }}" data-catid="{{ s.id }}" ><i id="tdown{{ s.id }}" class="fa fa-thumbs-o-down fa-2x"></i></a>
+  {% if s.current_user_vote == 1 %}
+    <a class ="upvotes" id = "{{ s.id }}" data-catid="{{ s.id }}"><i id="tup{{ s.id }}" class="fa fa-thumbs-up fa-2x" data-toggle="modal" data-target="#mymodal" ></i></a>&nbsp;
+    <a class ="downvotes" id = "{{ s.id }}" data-catid="{{ s.id }}" ><i id="tdown{{ s.id }}" class="fa fa-thumbs-o-down fa-2x" data-toggle="modal" data-target="#mymodal" ></i></a>
+  {% elif s.current_user_vote == -1 %}
+    <a class ="upvotes" id = "{{ s.id }}" data-catid="{{ s.id }}" ><i id="tup{{ s.id }}" class="fa fa-thumbs-o-up fa-2x" data-toggle="modal" data-target="#mymodal" ></i></a>&nbsp;
+    <a class ="downvotes" id = "{{ s.id }}" data-catid="{{ s.id }}"><i id="tdown{{ s.id }}" class="fa fa-thumbs-down fa-2x" data-toggle="modal" data-target="#mymodal" ></i></a>
+  {% else %}
+    <a class ="upvotes" id = "{{ s.id }}" data-catid="{{ s.id }}" ><i id="tup{{ s.id }}" class="fa fa-thumbs-o-up fa-2x" data-toggle="modal" data-target="#mymodal" ></i></a>&nbsp;
+    <a class ="downvotes" id = "{{ s.id }}" data-catid="{{ s.id }}" ><i id="tdown{{ s.id }}" class="fa fa-thumbs-o-down fa-2x" data-toggle="modal" data-target="#mymodal" ></i></a>
+  {% endif %}
   </span>
   </p>
     <div class="panel-group" id="accordion">
       <div class="panel panel-default">
         <div class="panel-heading">
-          <p>"{{ s.comment_set.all|first }}"<a data-toggle="collapse" data-parent="#accordion" href="#" class="comments-accordion pull-right" data-catid="{{ s.id }}">More</a></p>
+          <p>"{{ s.comment_set.latest }}"<a data-toggle="collapse" data-parent="#accordion" href="#" class="comments-accordion pull-right" data-catid="{{ s.id }}">More</a></p>
         </div>
         <div id="collapse{{ s.id }}" class="panel-collapse collapse in">
           <div class="panel-body">
@@ -45,29 +54,40 @@
             {{ c.text }} <span class="pull-right"><span class="label label-info">By {{ c.name }} -- {{ c.created_on|naturaltime }}</span></span>
             <hr>
             {% endfor %}
-            <form class="form" role="form" method="post" action="/startups/add_comment/">
-              {% csrf_token %}
-              <div class="row">
-                <div class="form-group col-xs-2">
-                  <input type="hidden" class="form-control" value="{{ s.id }}" name="startupid">
-                  <input type="text" class="form-control" placeholder="Name" name="name">
-                </div>
-                <div class="form-group col-xs-9">
-                  <input type="text" class="form-control" placeholder="Comment" name="comment">
-                </div>
-                <div class="form-group">
-                  <button class="btn btn-info comment-submit" id="postcomment{{ s.id }}">Post</button>
-                </div>
-              </div>
-            </form>
           </div>
         </div>
       </div>
     </div>
-  </div>
+  </li>
 {% endfor %}
+</ul>
 </div>
+<!-- MODAL FOR COMMENTS -->
+<div id="mymodal" class="modal fade" tabindex="-1" role="dialog" aria-hidden="true">
+  <div class="modal-dialog modal-sm">
+    <div class="modal-content">
+      <div class="modal-header"><h4>Tell us what you think</h4></div>
+      <div class="modal-body">
+      <form class="form" role="form" method="post" action="/startups/add_comment/">
+        {% csrf_token %}
+
+          <div class="form-group">
+            <input type="hidden" class="form-control" value="" name="startupid" id="dataforcomment">
+            <input type="text" class="form-control" placeholder="Name" name="name">
+          </div>
+          <div class="form-group">
+            <textarea rows="3" class="form-control" placeholder="Comment" name="comment"></textarea>
+          </div>
+          <div class="form-group">
+            <button class="btn btn-info btn-block comment-submit" id="postcomment{{ s.id }}">Post</button>
+          </div>
+
+      </form>
+      </div>
+    </div>
+  </div>
 </div>
+<!-- END OF MODAL -->
 <script type="text/javascript">
 $(document).ready(function(){
   $('.collapse').collapse();
@@ -78,10 +98,16 @@ $('.upvotes').click(function(){
   sid = $(this).attr("data-catid");
   var tempid = "#vote_".concat(sid);
   var tup = "#tup".concat(sid);
-    $.get('/startups/upvote/', {s_id: sid}, function(data){
+  var tdown = "#tdown".concat(sid);
+    $.get('/startups/vote/', {startup_id: sid, vote:1}, function(data){
       $(tempid).html(data);
     });
     $(tup).attr('class', 'fa fa-thumbs-up fa-2x');
+    $(tdown).attr('class', 'fa fa-thumbs-o-down fa-2x');
+    $('#dataforcomment').attr('value',sid);
+    /*$.get('/startups/ #refreshdiv', function(data){
+      $('#refreshdiv').empty().append(data);
+    });*/
 });
 
 $('.downvotes').click(function(){
@@ -89,10 +115,16 @@ $('.downvotes').click(function(){
   sid = $(this).attr("data-catid");
   var tempid = "#vote_".concat(sid);
   var tdown = "#tdown".concat(sid);
-    $.get('/startups/downvote/', {s_id: sid}, function(data){
+  var tup = "#tup".concat(sid);
+    $.get('/startups/vote/', {startup_id: sid, vote:-1}, function(data){
       $(tempid).html(data);
     });
     $(tdown).attr('class', 'fa fa-thumbs-down fa-2x');
+    $(tup).attr('class', 'fa fa-thumbs-o-up fa-2x');
+    $('#dataforcomment').attr('value',sid);
+    /*$.get('/startups/ #refreshdiv', function(data){
+      $('#refreshdiv').empty().append(data);
+    });*/
 });
 
 $('.comments-accordion').click(function(){
